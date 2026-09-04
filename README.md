@@ -35,7 +35,7 @@ ZCode 会话中直接使用 stata_run_selection / stata_run_file / stata_session
 
 ```powershell
 git clone https://github.com/JingYangYuan/stata-mcp-zcode-deploy.git
-cd stata-mcp-zcode-deploy
+cd stata-mcp-zcode
 powershell -ExecutionPolicy Bypass -File deploy.ps1                          # 默认 Stata 在 E:\Stata18
 # 或指定 Stata 路径 / 端口：
 powershell -ExecutionPolicy Bypass -File deploy.ps1 -StataPath "D:\Stata21" -Port 4001
