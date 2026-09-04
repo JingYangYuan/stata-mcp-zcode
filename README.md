@@ -1,6 +1,6 @@
 # stata-mcp-zcode
 
-在 Windows 上一键部署 [stata-mcp](https://github.com/hanlulong/stata-mcp)（DeepEcon.stata-mcp）到 [ZCode](https://zcode.ai) 全局配置的部署仓库。克隆后运行一个脚本即可完成全部安装，无需手动配置。
+在 Windows 上一键部署 [stata-mcp](https://github.com/hanlulong/stata-mcp)（DeepEcon.stata-mcp）到 ZCode 全局配置的部署仓库。克隆后运行一个脚本即可完成全部安装，无需手动配置。
 
 ## 架构
 
