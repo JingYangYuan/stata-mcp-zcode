@@ -1,4 +1,4 @@
-# stata-mcp-zcode
+# stata-mcp
 
 一键部署 [stata-mcp](https://github.com/hanlulong/stata-mcp)（DeepEcon.stata-mcp）到 **ZCode** 与 **Oh My Pi (omp)** 全局配置的部署仓库。支持 **macOS (Apple Silicon / Intel)** 与 **Windows 10/11**。克隆后运行一个脚本即可完成全部安装，无需手动配置，不污染其他任何现有配置。
 
@@ -46,8 +46,8 @@ http://localhost:4001/mcp-streamable    ~/.local/bin/stata-mcp (stdio bridge)
 ### macOS / Linux
 
 ```bash
-git clone https://github.com/JingYangYuan/stata-mcp-zcode.git
-cd stata-mcp-zcode
+git clone https://github.com/JingYangYuan/stata-mcp.git
+cd stata-mcp
 ./deploy.sh                                          # 默认 Stata 在 /Applications/Stata
 # 或显式指定路径与端口：
 ./deploy.sh --stata-path /Applications/Stata --port 4001
@@ -56,8 +56,8 @@ cd stata-mcp-zcode
 ### Windows
 
 ```powershell
-git clone https://github.com/JingYangYuan/stata-mcp-zcode.git
-cd stata-mcp-zcode
+git clone https://github.com/JingYangYuan/stata-mcp.git
+cd stata-mcp
 powershell -ExecutionPolicy Bypass -File deploy.ps1                          # 默认 Stata 在 E:\Stata18
 # 或显式指定路径与端口：
 powershell -ExecutionPolicy Bypass -File deploy.ps1 -StataPath "D:\Stata21" -Port 4001
