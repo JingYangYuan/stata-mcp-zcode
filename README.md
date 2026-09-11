@@ -1,80 +1,116 @@
 # stata-mcp-zcode
 
-在 Windows 上一键部署 [stata-mcp](https://github.com/hanlulong/stata-mcp)（DeepEcon.stata-mcp）到 ZCode 全局配置的部署仓库。克隆后运行一个脚本即可完成全部安装，无需手动配置。
+一键部署 [stata-mcp](https://github.com/hanlulong/stata-mcp)（DeepEcon.stata-mcp）到 **ZCode** 与 **Oh My Pi (omp)** 全局配置的部署仓库。支持 **macOS (Apple Silicon / Intel)** 与 **Windows 10/11**。克隆后运行一个脚本即可完成全部安装，无需手动配置，不污染其他任何现有配置。
 
 ## 架构
 
-stata-mcp 官方形态是 VS Code 扩展，MCP 服务器由扩展托管（VS Code 必须常开）。本仓库改为**独立后台服务**部署：
+stata-mcp 官方形态是 VS Code 扩展，MCP 服务器由扩展托管（VS Code 必须常开）。本仓库提供**独立后台服务 + 代理免疫的 stdio 桥接**部署：
 
-```
-打开 ZCode
-   │  SessionStart hook（hooks.enabled: true）
-   ▼
-~/.zcode/scripts/stata-mcp-start.ps1
-   │  检测 http://localhost:4001/health，未运行则用扩展自带 venv 拉起服务
-   ▼
-stata-mcp 独立服务（localhost:4001，隐藏窗口，日志在 %TEMP%\stata-mcp-standalone.log）
-   ▲
-   │  ZCode 全局配置 mcp.servers["stata-mcp"] → http://localhost:4001/mcp-streamable
-ZCode 会话中直接使用 stata_run_selection / stata_run_file / stata_session
+```text
+               ┌───────────────────────┐
+               │ ZCode / Oh My Pi 会话 │
+               └───────────┬───────────┘
+                           │
+       ┌───────────────────┴───────────────────┐
+       ▼ (HTTP 传输，ZCode 内部)                 ▼ (stdio 桥接，OMP / Claude / 终端)
+http://localhost:4001/mcp-streamable    ~/.local/bin/stata-mcp (stdio bridge)
+       │                                       │ (自动绕过 HTTP_PROXY/Clash 502)
+       └───────────────────┬───────────────────┘
+                           ▼
+             stata-mcp 独立服务 (端口 4001)
+                           ▼
+                    本地 Stata 17+
 ```
 
-好处：**VS Code 不需要打开**；服务只在用 ZCode 时按需启动（一次开机仅第一次启动时等待约 10 秒）。
+### 核心优势
+1. **VS Code 不需要打开**：服务脱离 IDE 独立常驻，通过进程钩子或 LaunchAgent 自动按需拉起。
+2. **终端代理免疫 (Proxy-Immune)**：开发机开启 Clash / Mihomo / Surge（设置了 `HTTP_PROXY=127.0.0.1:7890`）时，stdio 桥接采用 `trust_env=False` 直连本地服务，彻底杜绝 `502 Bad Gateway` 回环报错。
+3. **无损合并 (Zero Interference)**：部署脚本仅增量合并 `stata-mcp`，原样保留既有的 API Key、其他 MCP 服务器（Exa、Zotero 等）及模型配置。
+
+---
 
 ## 前提条件
 
 | 依赖 | 说明 |
 |---|---|
-| Windows 10/11 | 脚本使用 PowerShell 5.1（系统自带） |
-| Stata 17+ | 默认路径 `E:\Stata18`，其他位置用 `-StataPath` 参数指定 |
-| VS Code | 用于安装扩展本体（扩展提供服务器代码和 Stata 集成） |
-| [uv](https://docs.astral.sh/uv/) | 缺失时脚本会自动安装 |
-| ZCode | 已安装并至少成功启动过一次 |
+| **操作系统** | macOS (Apple Silicon / Intel) 或 Windows 10/11 |
+| **Stata 17+** | macOS 默认 `/Applications/Stata`；Windows 默认 `E:\Stata18`（可指定） |
+| **VS Code / Cursor** | 用于获取扩展代码包与 Stata 接口模块（运行时无需开启） |
+| **uv** | 缺失时脚本会自动安装 |
+| **ZCode / OMP** | 已安装并初始化至少一次 |
+
+---
 
 ## 一键部署
+
+### macOS / Linux
+
+```bash
+git clone https://github.com/JingYangYuan/stata-mcp-zcode.git
+cd stata-mcp-zcode
+./deploy.sh                                          # 默认 Stata 在 /Applications/Stata
+# 或显式指定路径与端口：
+./deploy.sh --stata-path /Applications/Stata --port 4001
+```
+
+### Windows
 
 ```powershell
 git clone https://github.com/JingYangYuan/stata-mcp-zcode.git
 cd stata-mcp-zcode
 powershell -ExecutionPolicy Bypass -File deploy.ps1                          # 默认 Stata 在 E:\Stata18
-# 或指定 Stata 路径 / 端口：
+# 或显式指定路径与端口：
 powershell -ExecutionPolicy Bypass -File deploy.ps1 -StataPath "D:\Stata21" -Port 4001
 ```
 
-脚本可重复运行（幂等）：已安装的部分自动跳过。
+脚本具有完全幂等性，已安装部分自动跳过。
 
-### 部署内容
+---
 
-1. 检查 Stata 可执行文件
-2. 检查/安装 uv
-3. 安装 VS Code 扩展 `DeepEcon.stata-mcp`
-4. 预构建扩展的 Python 3.11 虚拟环境（官方方式首次运行时要下载 Python + 依赖，本脚本提前完成，服务可秒级启动）
-5. 安装 hook 脚本到 `%USERPROFILE%\.zcode\scripts\stata-mcp-start.ps1`
-6. 合并写入 `%USERPROFILE%\.zcode\cli\config.json`：
-   - `mcp.servers["stata-mcp"]` → `http://localhost:<port>/mcp-streamable`
-   - `hooks.events.SessionStart` → 启动脚本（`hooks.enabled: true`）
-   - **只新增/更新这两处，不碰配置文件中的其他任何内容**（其他 MCP 服务器、API Key 等原样保留）
-7. 立即启动服务并做健康检查
+## 部署产物与配置位置
 
-完成后**打开一个新的 ZCode 会话**即可使用。
+1. **服务启动脚本**：
+   - macOS: `~/.zcode/scripts/stata-mcp-start.sh`（内置 `--noproxy "*"` 探测，秒级就绪）
+   - Windows: `%USERPROFILE%\.zcode\scripts\stata-mcp-start.ps1`
+2. **代理免疫 stdio 桥接命令**：
+   - `~/.local/bin/stata-mcp`（可直接供 OMP、Claude Code、Codex 的 `type: "stdio"` 接入）
+3. **宿主配置自动合并**：
+   - **ZCode** (`~/.zcode/cli/config.json`)：注册 `mcp.servers["stata-mcp"]` 与 `SessionStart` 钩子。
+   - **Oh My Pi** (`~/.omp/agent/mcp.json`)：注册 `mcpServers["stata-mcp"]`（采用 stdio 桥接模式，避开环境变量冲突）。
+4. **服务日志**：
+   - macOS: `/tmp/stata-mcp-standalone.log`
+   - Windows: `%TEMP%\stata-mcp-standalone.log`
+
+---
 
 ## 使用
 
-部署后直接在 ZCode 里用自然语言指挥 Stata，例如：
+在 ZCode 或 Oh My Pi 中直接使用自然语言驱动 Stata：
 
-- 「用 Stata 跑一下 regression.do」
-- 「对 data.dta 做描述性统计并导出表格」
+- 「对 dataset.dta 做描述统计并导出表格」
+- 「运行 01_baseline.do 并输出回归结果」
 
-可用工具：`stata_run_selection`（运行代码片段）、`stata_run_file`（运行 do 文件）、`stata_session`（会话管理）。
+### 暴露工具列表
+- `stata_run_selection`：运行 Stata 代码片段并返回输出。
+- `stata_run_file`：运行 `.do` 文件（支持超时与工作目录控制）。
+- `stata_session`：会话管理（list / destroy，支持多会话隔离）。
 
-## 常见问题
+---
 
-- **ZCode 里 stata-mcp 显示未连接**：开个新会话，或在 设置 → MCP 里手动重连。服务就绪需要几秒，hook 会等到就绪才返回。
-- **端口冲突**：独立服务默认用 4001，与 VS Code 扩展默认的 4000 互不干扰；两边同时开也不冲突。
-- **服务日志**：`%TEMP%\stata-mcp-standalone.log`。
-- **不想用 hook，想开机常驻**：把同一脚本加入任务计划程序的"登录时启动"即可。
-- **卸载**：删除 `%USERPROFILE%\.zcode\scripts\stata-mcp-start.ps1`，并从 `~/.zcode/cli/config.json` 移除 `mcp.servers["stata-mcp"]` 与对应的 SessionStart hook 条目。
+## 常见问题与排查
+
+1. **终端开启网络代理后连接显示 502**：
+   - 本项目通过 `stata-mcp` stdio 桥接彻底解决该问题，确保 `~/.omp/agent/mcp.json` 中配置指向 `~/.local/bin/stata-mcp` 即可。
+2. **端口占用**：
+   - 默认端口 4001，与 VS Code 官方默认的 4000 互不冲突。若需修改，重新运行部署脚本时传入 `--port <新端口>` 即可。
+3. **健康检查验证**：
+   ```bash
+   curl --noproxy "*" -s http://127.0.0.1:4001/health
+   # 预期输出: {"status":"ok","service":"Stata MCP Server",...}
+   ```
+
+---
 
 ## 致谢
 
-- [hanlulong/stata-mcp](https://github.com/hanlulong/stata-mcp)（DeepEcon 团队）— 本仓库部署的 MCP 服务器本体
+- [hanlulong/stata-mcp](https://github.com/hanlulong/stata-mcp)（DeepEcon 团队）— MCP 服务器本体
